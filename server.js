@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import lyricsFinder from 'lyrics-finder';
 import axios from 'axios';
 
+import os from 'os';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -16,7 +18,8 @@ app.use(cors());
 // Serve the production build (dist/) as static files
 app.use(express.static(path.join(__dirname, 'dist')));
 
-const ytdlpPath = path.resolve('node_modules/youtube-dl-exec/bin/yt-dlp.exe');
+const ytdlpBinary = os.platform() === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+const ytdlpPath = path.resolve(`node_modules/youtube-dl-exec/bin/${ytdlpBinary}`);
 
 function getChannelVideos(channelUrl) {
   return new Promise((resolve) => {
@@ -356,6 +359,7 @@ app.get('/{path}', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(3001, '0.0.0.0', () => {
-  console.log('ToroFy running on http://0.0.0.0:3001');
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ToroFy running on http://0.0.0.0:${PORT}`);
 });
