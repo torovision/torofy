@@ -65,55 +65,54 @@ app.get('/api/stream', async (req, res) => {
 
     console.log(`Streaming audio for: ${title}`);
 
-    const quality = req.query.quality === 'low' ? 'worstaudio[ext=m4a]/worstaudio/worst' : 'bestaudio[ext=m4a]/bestaudio/best';
-    const cmd = `"${ytdlpPath}" --js-runtimes node -q -o - -f "${quality}" "${videoUrl}"`;
+    // Bypass YouTube bot checks using Android/Web client combination and force direct streams
+    const quality = req.query.quality === 'low' ? 'worstaudio/worst' : 'bestaudio/best';
+    const cmd = `"${ytdlpPath}" --extractor-args "youtube:player_client=android,web" --js-runtimes node --no-warnings --get-url -f "${quality}" "${videoUrl}"`;
 
-    const ytdlpProcess = spawn(cmd, { shell: true });
-    const chunks = [];
-
-    ytdlpProcess.stdout.on('data', (chunk) => chunks.push(chunk));
-    ytdlpProcess.stderr.on('data', () => {}); // Ignore
-
-    ytdlpProcess.on('close', (code) => {
-      if (code !== 0 || chunks.length === 0) {
-        if (!res.headersSent) res.status(500).json({ error: 'Stream failed' });
-        return;
+    exec(cmd, { timeout: 30000 }, async (error, stdout, stderr) => {
+      if (error) {
+        console.error('yt-dlp error:', stderr || error.message);
+        return res.status(500).json({ error: 'Failed to extract stream URL' });
       }
 
-      const audioBuffer = Buffer.concat(chunks);
-      const total = audioBuffer.length;
-      const range = req.headers.range;
-
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
-        const chunkSize = (end - start) + 1;
-
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${total}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': 'audio/mp4',
-        });
-        res.end(audioBuffer.subarray(start, end + 1));
-      } else {
-        res.writeHead(200, {
-          'Content-Length': total,
-          'Content-Type': 'audio/mp4',
-          'Accept-Ranges': 'bytes',
-        });
-        res.end(audioBuffer);
+      const streamUrl = stdout.trim().split('\n')[0];
+      if (!streamUrl || !streamUrl.startsWith('http')) {
+        return res.status(500).json({ error: 'Invalid Stream URL returned' });
       }
-    });
 
-    ytdlpProcess.on('error', (err) => {
-      console.error('Stream yt-dlp error:', err);
-      if (!res.headersSent) res.status(500).end();
-    });
+      console.log(`Proxying Google Video CDN Stream...`);
+      
+      try {
+        const headers = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        };
+        if (req.headers.range) {
+          headers['Range'] = req.headers.range;
+        }
 
-    req.on('close', () => {
-      ytdlpProcess.kill();
+        const response = await axios({
+          url: streamUrl,
+          method: 'GET',
+          responseType: 'stream',
+          headers: headers,
+          validateStatus: status => status >= 200 && status < 400
+        });
+
+        res.status(response.status);
+        for (const [key, value] of Object.entries(response.headers)) {
+          // Prevent setting duplicate chunked encoding headers
+          if (key.toLowerCase() !== 'transfer-encoding') {
+            res.setHeader(key, value);
+          }
+        }
+        res.setHeader('Content-Type', 'audio/mp4');
+        response.data.pipe(res);
+      } catch (proxyError) {
+        console.error('Proxy Error:', proxyError.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to proxy stream' });
+        }
+      }
     });
 
   } catch (error) {
@@ -141,7 +140,7 @@ app.get('/api/proxy-audio', async (req, res) => {
     
     // Spawn yt-dlp and pipe stdout directly to the response
     // MUST use -q to prevent yt-dlp from polluting the audio stream with text logs!
-    const cmd = `"${ytdlpPath}" --js-runtimes node -q -o - -f "${quality}" "${videoUrl}"`;
+    const cmd = `"${ytdlpPath}" --extractor-args "youtube:player_client=android,web" --js-runtimes node -q -o - -f "${quality}" "${videoUrl}"`;
     const ytdlpProcess = spawn(cmd, { shell: true });
 
     ytdlpProcess.stdout.pipe(res);
