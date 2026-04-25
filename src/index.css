@@ -1,0 +1,622 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg-base: #000000;
+  --bg-highlight: #1a1a1a;
+  --bg-press: #000000;
+  --bg-elevated-base: #242424;
+  --bg-elevated-highlight: #2a2a2a;
+  --bg-elevated-press: #000000;
+  
+  --text-base: #ffffff;
+  --text-subdued: #a7a7a7;
+  --text-bright-accent: #1ed760;
+  
+  --essential-base: #ffffff;
+  --essential-subdued: #727272;
+  --essential-bright-accent: #1ed760;
+  
+  --decorative-base: #ffffff;
+  --decorative-subdued: #292929;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  flex-direction: column;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsla(0,0%,100%,.3);
+  border-radius: 6px;
+  border: 3px solid var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsla(0,0%,100%,.5);
+}
+
+/* Utility Classes */
+.text-subdued {
+  color: var(--text-subdued);
+}
+
+.text-accent {
+  color: var(--text-bright-accent);
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.truncate-2-lines {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;  
+  overflow: hidden;
+}
+
+/* ===========================
+   BUTTONS
+   =========================== */
+.btn-primary {
+  background-color: var(--text-bright-accent);
+  color: #000;
+  border: none;
+  border-radius: 500px;
+  padding: 8px 32px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: scale(1.04);
+  background-color: #1fdf64;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-subdued);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.btn-icon:hover {
+  color: var(--text-base);
+}
+
+/* ===========================
+   AUTH BACKGROUND
+   =========================== */
+@keyframes scrollBackground {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+.auth-background {
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  transform: rotate(-15deg);
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+  animation: scrollBackground 120s linear infinite;
+}
+
+.auth-background img {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ===========================
+   iOS SAFE AREA
+   =========================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 768px) {
+    /* Player sits at absolute bottom - needs safe area padding */
+    .player-container {
+      padding-bottom: env(safe-area-inset-bottom) !important;
+      height: calc(60px + env(safe-area-inset-bottom)) !important;
+    }
+    /* Nav sits above the player (player height + safe area) */
+    .sidebar-container {
+      bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+    }
+    /* Content needs enough space for both */
+    .main-content-area {
+      padding-bottom: calc(130px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+}
+
+/* ===========================
+   SMALL PHONES (up to 480px)
+   iPhone SE, Galaxy S, compact phones
+   =========================== */
+@media (max-width: 480px) {
+  .app-container {
+    flex-direction: column !important;
+  }
+
+  /* Player fixed at very bottom */
+  .player-container {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    z-index: 300 !important;
+    padding: 0 12px !important;
+    background-color: #181818 !important;
+    border-top: 1px solid #282828 !important;
+  }
+
+  /* Sidebar nav bar above player */
+  .sidebar-container {
+    position: fixed !important;
+    bottom: 60px !important;
+    left: 0;
+    width: 100% !important;
+    height: 50px !important;
+    flex-direction: row !important;
+    justify-content: space-around;
+    padding: 0 !important;
+    background-color: var(--bg-base) !important;
+    z-index: 200 !important;
+    border-top: 1px solid #282828;
+    border-radius: 0 !important;
+  }
+
+  .sidebar-container .logo-header,
+  .sidebar-container .extra-actions,
+  .sidebar-container > div:last-child,
+  .sidebar-container > a {
+    display: none !important;
+  }
+
+  .sidebar-container nav {
+    flex-direction: row !important;
+    width: 100%;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+  }
+
+  .sidebar-container nav a {
+    flex-direction: column;
+    gap: 2px !important;
+    font-size: 10px;
+    padding: 6px 4px !important;
+    text-align: center;
+  }
+
+  /* Main content scrollable with enough bottom padding */
+  .main-content-area {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding-bottom: 130px !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
+
+/* ===========================
+   STANDARD PHONES (481px - 768px)
+   iPhone 12-16, Pixel, Galaxy S series
+   =========================== */
+@media (min-width: 481px) and (max-width: 768px) {
+  .app-container {
+    flex-direction: column !important;
+  }
+
+  /* Player fixed at bottom */
+  .player-container {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 64px !important;
+    min-height: 64px !important;
+    z-index: 300 !important;
+    padding: 0 12px !important;
+    background-color: #181818 !important;
+    border-top: 1px solid #282828 !important;
+  }
+
+  /* Sidebar nav above player */
+  .sidebar-container {
+    position: fixed !important;
+    bottom: 64px !important;
+    left: 0;
+    width: 100% !important;
+    height: 54px !important;
+    flex-direction: row !important;
+    justify-content: space-around;
+    padding: 0 !important;
+    background-color: var(--bg-base) !important;
+    z-index: 200 !important;
+    border-top: 1px solid #282828;
+    border-radius: 0 !important;
+  }
+
+  .sidebar-container .logo-header,
+  .sidebar-container .extra-actions,
+  .sidebar-container > div:last-child,
+  .sidebar-container > a {
+    display: none !important;
+  }
+
+  .sidebar-container nav {
+    flex-direction: row !important;
+    width: 100%;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+  }
+
+  .sidebar-container nav a {
+    flex-direction: column;
+    gap: 4px !important;
+    font-size: 10px;
+    padding: 8px 4px !important;
+  }
+
+  .main-content-area {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding-bottom: 140px !important;
+  }
+
+  .player-extra-controls {
+    display: none !important;
+  }
+
+  .player-main-controls .progress-bar {
+    display: none !important;
+  }
+}
+
+/* ===========================
+   TABLETS (769px - 1024px)
+   iPad, Galaxy Tab, Surface Go
+   =========================== */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar-container {
+    width: 200px !important;
+  }
+
+  .sidebar-container .logo-header h1 {
+    font-size: 20px !important;
+  }
+
+  .player-track-info {
+    width: 30% !important;
+  }
+
+  .player-main-controls {
+    width: 45% !important;
+  }
+
+  .player-extra-controls {
+    width: 25% !important;
+  }
+}
+
+/* ===========================
+   LARGE TABLETS / SMALL LAPTOPS (1025px - 1366px)
+   iPad Pro, Surface Pro
+   =========================== */
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .sidebar-container {
+    width: 220px !important;
+  }
+}
+
+/* ===========================
+   STANDARD DESKTOP (1367px - 1920px)
+   Default experience — no overrides needed
+   =========================== */
+
+/* ===========================
+   TV / ULTRA-WIDE / 4K (1921px+)
+   Smart TVs, large monitors, projectors
+   =========================== */
+@media (min-width: 1921px) {
+  :root {
+    font-size: 18px;
+  }
+
+  .sidebar-container {
+    width: 320px !important;
+  }
+
+  .sidebar-container .logo-header h1 {
+    font-size: 32px !important;
+  }
+
+  .sidebar-container nav a {
+    font-size: 18px !important;
+    padding: 12px 16px !important;
+    gap: 20px !important;
+  }
+
+  .player-container {
+    height: 120px !important;
+    padding: 0 32px !important;
+  }
+
+  .player-track-info img {
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  .player-track-info .track-name {
+    font-size: 20px !important;
+  }
+
+  .player-track-info .track-artist {
+    font-size: 16px !important;
+  }
+
+  .player-main-controls .control-buttons button,
+  .player-main-controls .control-buttons div {
+    transform: scale(1.3);
+  }
+
+  .player-main-controls .progress-bar {
+    height: 6px !important;
+  }
+
+  .main-content-area {
+    margin: 12px 12px 0 0 !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* 8K / Projection (3840px+) */
+@media (min-width: 3840px) {
+  :root {
+    font-size: 24px;
+  }
+
+  .sidebar-container {
+    width: 480px !important;
+  }
+
+  .player-container {
+    height: 160px !important;
+    padding: 0 48px !important;
+  }
+
+  .player-track-info img {
+    width: 120px !important;
+    height: 120px !important;
+  }
+
+  .player-main-controls .control-buttons button,
+  .player-main-controls .control-buttons div {
+    transform: scale(1.8);
+  }
+}
+
+/* ===========================
+   LANDSCAPE PHONE (short + wide)
+   Phone rotated sideways
+   =========================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .sidebar-container {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0 !important;
+    width: 64px !important;
+    height: 100% !important;
+    flex-direction: column !important;
+    padding: 8px 0 !important;
+    z-index: 100;
+    border-right: 1px solid #282828;
+    border-top: none;
+  }
+
+  .sidebar-container .logo-header,
+  .sidebar-container .extra-actions,
+  .sidebar-container > div:last-child,
+  .sidebar-container > a {
+    display: none !important;
+  }
+
+  .sidebar-container nav {
+    flex-direction: column !important;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .sidebar-container nav a {
+    flex-direction: column;
+    gap: 2px !important;
+    font-size: 9px;
+    padding: 6px !important;
+    text-align: center;
+  }
+
+  .main-content-area {
+    margin-left: 64px !important;
+    margin-right: 0 !important;
+    margin-top: 0 !important;
+    border-radius: 0 !important;
+    padding-bottom: 80px !important;
+  }
+
+  .player-container {
+    margin-left: 64px !important;
+    height: 56px !important;
+    padding: 2px 12px !important;
+  }
+
+  .player-extra-controls {
+    display: none !important;
+  }
+
+  .player-main-controls .progress-bar {
+    display: none !important;
+  }
+}
+
+/* ===========================
+   TOUCH DEVICE OPTIMIZATIONS
+   =========================== */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets for fingers */
+  .sidebar-container nav a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .player-main-controls .control-buttons button,
+  .player-main-controls .control-buttons div {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Disable hover effects on touch (prevents sticky hover) */
+  .btn-primary:hover {
+    transform: none;
+  }
+
+  .btn-primary:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+
+  /* Hide scrollbars on touch devices */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: none;
+  }
+}
+
+/* ===========================
+   REDUCED MOTION
+   =========================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .auth-background {
+    animation: none !important;
+  }
+}
+
+/* ===========================
+   PRINT (for lyrics)
+   =========================== */
+@media print {
+  .sidebar-container,
+  .player-container {
+    display: none !important;
+  }
+  .main-content-area {
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+/* ===========================
+   ANIMATIONS
+   =========================== */
+@keyframes eq-bar {
+  0% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+  100% { transform: scaleY(0.3); }
+}
+
+.eq-bar {
+  width: 3px;
+  background-color: #1ed760;
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: eq-bar 1s infinite ease-in-out;
+}
+.eq-bar:nth-child(1) { animation-duration: 0.7s; }
+.eq-bar:nth-child(2) { animation-duration: 1.1s; animation-delay: 0.2s; }
+.eq-bar:nth-child(3) { animation-duration: 0.9s; animation-delay: 0.4s; }
+.eq-bar:nth-child(4) { animation-duration: 0.8s; animation-delay: 0.1s; }
