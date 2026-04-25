@@ -108,7 +108,7 @@ app.get('/api/stream', async (req, res) => {
         res.setHeader('Content-Type', 'audio/mp4');
         response.data.pipe(res);
       } catch (proxyError) {
-        console.error('Proxy Error:', proxyError.message);
+        console.error('Proxy Error:', proxyError);
         if (!res.headersSent) {
           res.status(500).json({ error: 'Failed to proxy stream' });
         }
@@ -159,6 +159,19 @@ app.get('/api/proxy-audio', async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.get('/api/debug', (req, res) => {
+  exec(`ls -la node_modules/youtube-dl-exec/bin && "${ytdlpPath}" --version`, (err, stdout, stderr) => {
+    res.json({
+      platform: os.platform(),
+      path: ytdlpPath,
+      stdout: stdout,
+      stderr: stderr,
+      err: err ? err.message : null
+    });
+  });
+});
+
 
 app.get('/api/search', async (req, res) => {
   const query = req.query.q;
