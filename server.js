@@ -6,7 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import lyricsFinder from 'lyrics-finder';
 import axios from 'axios';
-
+import http from 'http';
+import https from 'https';
 import os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,11 +91,16 @@ app.get('/api/stream', async (req, res) => {
           headers['Range'] = req.headers.range;
         }
 
+        const httpAgent = new http.Agent({ family: 4 });
+        const httpsAgent = new https.Agent({ family: 4 });
+
         const response = await axios({
           url: streamUrl,
           method: 'GET',
           responseType: 'stream',
           headers: headers,
+          httpAgent,
+          httpsAgent,
           validateStatus: status => status >= 200 && status < 400
         });
 
