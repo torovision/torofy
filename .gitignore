@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 test_stream.m4a
 test.m4a
+scratch*.js
+copy.js
+*.apk
