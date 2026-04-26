@@ -360,7 +360,11 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   };
 
   const handleDownload = async () => {
-    alert('Downloads are disabled in Client-Side Streaming mode.');
+    if (!currentTrack || isDownloaded || downloading) return;
+    setDownloading(true);
+    const success = await downloadTrack(currentTrack, dataSaver ? 'low' : 'high');
+    if (success) setIsDownloaded(true);
+    setDownloading(false);
   };
 
   const handleTimeUpdate = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };

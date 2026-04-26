@@ -12,8 +12,21 @@ export const getOfflineTracks = () => {
 
 export const downloadTrack = async (track, quality = 'high') => {
   if (await isTrackOffline(track.trackId)) return true;
-  
-  const query = track.url ? track.url : `${track.trackName} ${track.artistName} audio`;
+
+  // Build the best possible search query for yt-dlp
+  let query;
+  if (track.youtubeId) {
+    // We already resolved the YouTube ID (from playback), use it directly
+    query = `https://youtube.com/watch?v=${track.youtubeId}`;
+  } else if (track.isItunes) {
+    // iTunes track: search by artist + song name
+    query = `${track.trackName} ${track.artistName} audio`;
+  } else if (track.url && track.url.startsWith('http')) {
+    query = track.url;
+  } else {
+    query = `${track.trackName} ${track.artistName} audio`;
+  }
+
   const proxyUrl = `${API_URL}/api/proxy-audio?query=${encodeURIComponent(query)}&quality=${quality}`;
 
   try {
