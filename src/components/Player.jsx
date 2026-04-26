@@ -4,6 +4,7 @@ import axios from 'axios';
 import { API_URL } from '../utils/config';
 import { isTrackOffline, getOfflineStreamUrl, downloadTrack } from '../utils/offlineCache';
 import { DownloadCloud } from 'lucide-react';
+import YouTube from 'react-youtube';
 
 // Tiny silent MP3 to unlock iOS audio
 const SILENCE_MP3 = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwTHAAAAAAD/+1DEAAAHAAGSdAAAAgAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7UMQbAPAAAaQAAAAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
@@ -37,6 +38,8 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [isMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [ytPlayer, setYtPlayer] = useState(null);
+  const [resolvedYtId, setResolvedYtId] = useState(null);
 
   const durationSecs = duration > 0 ? duration : (currentTrack ? (currentTrack.trackTimeMillis / 1000) : 0);
   const progressPercent = durationSecs > 0 ? (currentTime / durationSecs) * 100 : 0;
@@ -112,35 +115,77 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
       return;
     }
 
-    if (currentTrack.trackId === prefetchedTrackId && nextStreamUrl) {
-      setStreamUrl(nextStreamUrl);
-      setIsBuffering(false);
-      setPrefetchedTrackId(null);
-      setNextStreamUrl(null);
-      return;
-    }
-
+    // For YouTube streaming (client-side)
     setIsBuffering(true);
     setStreamUrl(null);
     setCurrentTime(0);
     setDuration(0);
-
-    const loadTrack = async () => {
-      // 1. Check offline cache
-      const offlineUrl = await getOfflineStreamUrl(currentTrack.trackId);
+    setResolvedYtId(null);
+    
+    // Check if it's cached offline first
+    getOfflineStreamUrl(currentTrack.trackId).then(offlineUrl => {
       if (offlineUrl) {
         setStreamUrl(offlineUrl);
-        return;
+      } else {
+        // If not offline, resolve YouTube ID if it's from iTunes
+        if (currentTrack.isItunes && !currentTrack.youtubeId) {
+          axios.get(`${API_URL}/api/get-yt-id?query=${encodeURIComponent(currentTrack.trackName + ' ' + currentTrack.artistName)}`)
+            .then(res => {
+              if (res.data.videoId) {
+                currentTrack.youtubeId = res.data.videoId;
+                setResolvedYtId(res.data.videoId);
+              } else {
+                setIsBuffering(false);
+                playNext();
+              }
+            })
+            .catch(() => {
+              setIsBuffering(false);
+              playNext();
+            });
+        } else if (currentTrack.youtubeId) {
+          setResolvedYtId(currentTrack.youtubeId);
+        } else {
+          setResolvedYtId(currentTrack.trackId);
+        }
       }
-      
-      // 2. Natively stream the proxy endpoint
-      const query = currentTrack.url ? currentTrack.url : (currentTrack.trackName + ' ' + currentTrack.artistName);
-      const streamEndpoint = `${API_URL}/api/stream?query=${encodeURIComponent(query)}&quality=${dataSaver ? 'low' : 'high'}`;
-      setStreamUrl(streamEndpoint);
-    };
-
-    loadTrack();
+    });
   }, [currentTrack, dataSaver]);
+
+  // Poll YouTube player for current time
+  useEffect(() => {
+    let interval;
+    if (isPlaying && ytPlayer && currentTrack && !currentTrack.isLocal && !streamUrl) {
+      interval = setInterval(async () => {
+        try {
+          const time = await ytPlayer.getCurrentTime();
+          if (time !== undefined) setCurrentTime(time);
+        } catch (e) {}
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, ytPlayer, currentTrack, streamUrl]);
+
+  const onYtReady = (e) => {
+    setYtPlayer(e.target);
+    e.target.setVolume(volume * 100);
+  };
+
+  const onYtStateChange = (e) => {
+    // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
+    if (e.data === 1) {
+      e.target.setVolume(volume * 100); // Enforce max volume
+      setIsPlaying(true);
+      setIsBuffering(false);
+      e.target.getDuration().then(d => setDuration(d));
+    } else if (e.data === 2) {
+      setIsPlaying(false);
+    } else if (e.data === 0) {
+      handleEnded();
+    } else if (e.data === 3) {
+      setIsBuffering(true);
+    }
+  };
 
   // Extract dominant color from artwork
   useEffect(() => {
@@ -177,31 +222,15 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
     }
   }, [currentTime, showLyrics]);
 
-  // Prefetch next track stream URL for gapless playback
-  useEffect(() => {
-    if (currentTime > 0 && durationSecs > 0 && (durationSecs - currentTime) < 25) {
-      const nextIdx = isShuffle ? -1 : (queueIndex < queue?.length - 1 ? queueIndex + 1 : (isRepeat ? 0 : -1));
-      if (nextIdx !== -1 && queue && queue[nextIdx]) {
-        const nextTrack = queue[nextIdx];
-        if (!nextTrack.isLocal && nextTrack.trackId !== prefetchedTrackId) {
-          setPrefetchedTrackId(nextTrack.trackId);
-          
-          getOfflineStreamUrl(nextTrack.trackId).then(offlineUrl => {
-            if (offlineUrl) {
-              setNextStreamUrl(offlineUrl);
-            } else {
-              const query = nextTrack.url ? nextTrack.url : (nextTrack.trackName + ' ' + nextTrack.artistName);
-              setNextStreamUrl(`${API_URL}/api/stream?query=${encodeURIComponent(query)}&quality=${dataSaver ? 'low' : 'high'}`);
-            }
-          });
-        }
-      }
-    }
-  }, [currentTime, durationSecs, queue, queueIndex, isShuffle, isRepeat, prefetchedTrackId, dataSaver]);
+  // Prefetching removed for client-side iframe
 
   // When stream URL arrives, load and play
   useEffect(() => {
-    if (!audioRef.current || !streamUrl) return;
+    if (!audioRef.current) return;
+    if (!streamUrl) {
+      audioRef.current.pause();
+      return;
+    }
     const audio = audioRef.current;
     audio.src = streamUrl;
     audio.load();
@@ -229,19 +258,34 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   };
 
   const togglePlay = useCallback(() => {
-    if (!currentTrack || !audioRef.current) return;
+    if (!currentTrack) return;
     unlockAudio();
-    const audio = audioRef.current;
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
-      if (!audio.src || audio.src === SILENCE_MP3) return;
-      const p = audio.play();
-      if (p) p.catch((e) => console.warn('Play failed:', e));
+    
+    // Local / Offline Track
+    if (currentTrack.isLocal || streamUrl) {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      } else {
+        setIsPlaying(true);
+        if (!audio.src || audio.src === SILENCE_MP3) return;
+        const p = audio.play();
+        if (p) p.catch((e) => console.warn('Play failed:', e));
+      }
+    } 
+    // YouTube Client-Side Track
+    else if (ytPlayer) {
+      if (isPlaying) {
+        ytPlayer.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        ytPlayer.playVideo();
+        setIsPlaying(true);
+      }
     }
-  }, [currentTrack, isPlaying, setIsPlaying, unlockAudio]);
+  }, [currentTrack, isPlaying, setIsPlaying, unlockAudio, streamUrl, ytPlayer]);
 
   // Sync play/pause - but DON'T trigger buffering on pause
   useEffect(() => {
@@ -316,26 +360,27 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   };
 
   const handleDownload = async () => {
-    if (!currentTrack || isDownloaded || downloading) return;
-    setDownloading(true);
-    const success = await downloadTrack(currentTrack, dataSaver ? 'low' : 'high');
-    if (success) setIsDownloaded(true);
-    setDownloading(false);
+    alert('Downloads are disabled in Client-Side Streaming mode.');
   };
 
   const handleTimeUpdate = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
   const handleLoadedMetadata = () => { if (audioRef.current && audioRef.current.duration && isFinite(audioRef.current.duration)) setDuration(audioRef.current.duration); };
   const handleSeek = (e) => {
-    if (audioRef.current && durationSecs > 0) {
+    if (durationSecs > 0) {
       const seekTime = (e.target.value / 100) * durationSecs;
-      audioRef.current.currentTime = seekTime;
       setCurrentTime(seekTime);
+      if (currentTrack.isLocal || streamUrl) {
+        if (audioRef.current) audioRef.current.currentTime = seekTime;
+      } else if (ytPlayer) {
+        ytPlayer.seekTo(seekTime, true);
+      }
     }
   };
   const handleVolumeChange = (e) => {
     const newVol = e.target.value / 100;
     setVolume(newVol);
     if (audioRef.current) audioRef.current.volume = newVol;
+    if (ytPlayer) ytPlayer.setVolume(newVol * 100);
   };
   const handleEnded = () => { if (onAutoEnded) onAutoEnded(); else if (playNext) playNext(); else setIsPlaying(false); };
 
@@ -404,8 +449,15 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
           onPlaying={() => setIsBuffering(false)} onCanPlay={() => setIsBuffering(false)}
           onError={() => setIsBuffering(false)}
         />
-        {/* Invisible audio element to force the browser to buffer the next song's bytes! */}
-        {nextStreamUrl && <audio preload="auto" muted src={nextStreamUrl} />}
+        {!currentTrack.isLocal && !streamUrl && resolvedYtId && (
+          <YouTube 
+            videoId={resolvedYtId}
+            opts={{ height: '0', width: '0', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1 } }}
+            onReady={onYtReady}
+            onStateChange={onYtStateChange}
+            onError={() => { setIsBuffering(false); playNext(); }}
+          />
+        )}
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: '#000', zIndex: 9999,
@@ -657,7 +709,15 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
         onPlaying={() => setIsBuffering(false)} onCanPlay={() => setIsBuffering(false)}
         onError={() => setIsBuffering(false)}
       />
-      {nextStreamUrl && <audio preload="auto" muted src={nextStreamUrl} />}
+      {currentTrack && !currentTrack.isLocal && !streamUrl && resolvedYtId && (
+        <YouTube 
+          videoId={resolvedYtId}
+          opts={{ height: '0', width: '0', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1 } }}
+          onReady={onYtReady}
+          onStateChange={onYtStateChange}
+          onError={() => { setIsBuffering(false); playNext(); }}
+        />
+      )}
 
       <div className="player-container" style={{
         height: isMobile ? '60px' : '90px',

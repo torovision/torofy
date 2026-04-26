@@ -178,6 +178,22 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+app.get('/api/get-yt-id', async (req, res) => {
+  const query = req.query.query;
+  if (!query) return res.status(400).json({ error: 'Query is required' });
+
+  try {
+    const searchResult = await ytSearch(query + ' audio');
+    const videos = searchResult.videos;
+    if (videos.length === 0) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    res.json({ videoId: videos[0].videoId });
+  } catch (error) {
+    console.error('Failed to get yt id:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.get('/api/search', async (req, res) => {
   const query = req.query.q;

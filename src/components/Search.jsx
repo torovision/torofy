@@ -17,18 +17,7 @@ const Search = ({ playTrack, lang }) => {
 
   const downloadToLibrary = async (track, e) => {
     e.stopPropagation();
-    const trackId = track.trackId;
-    if (downloading[trackId]) return;
-    setDownloading(prev => ({ ...prev, [trackId]: 'loading' }));
-    try {
-      await downloadTrack(track);
-      setDownloading(prev => ({ ...prev, [trackId]: 'done' }));
-      setTimeout(() => setDownloading(prev => { const n = {...prev}; delete n[trackId]; return n; }), 2000);
-    } catch (err) {
-      console.error('Download failed:', err);
-      setDownloading(prev => { const n = {...prev}; delete n[trackId]; return n; });
-      alert('Download failed. Please try again.');
-    }
+    alert('Downloads are disabled in Client-Side Streaming mode.');
   };
 
   const addToPlaylist = (track, e) => {
@@ -82,11 +71,21 @@ const Search = ({ playTrack, lang }) => {
     const delayDebounceFn = setTimeout(() => {
       if (query.trim()) {
         setLoading(true);
-        axios.get(`${API_URL}/api/search?q=${encodeURIComponent(query)}`)
+        axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=25`)
           .then(res => {
             if (res.data.results) {
-              setResults(res.data.results);
-              setChannels(res.data.channels || []);
+              const mapped = res.data.results.map(r => ({
+                trackId: r.trackId.toString(),
+                trackName: r.trackName,
+                artistName: r.artistName,
+                collectionName: r.collectionName,
+                artworkUrl100: r.artworkUrl100?.replace('100x100bb.jpg', '600x600bb.jpg'),
+                trackTimeMillis: r.trackTimeMillis || 180000,
+                url: r.trackViewUrl,
+                isItunes: true
+              }));
+              setResults(mapped);
+              setChannels([]);
               
               // Save to recent searches
               let recents = JSON.parse(localStorage.getItem('torofy_recentSearches')) || [];
@@ -204,15 +203,7 @@ const Search = ({ playTrack, lang }) => {
                   <div onClick={(e) => toggleLike(track, e)} style={{ minWidth: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {likedTracks.find(t => t.trackId === track.trackId) ? <Heart size={isMobile ? 18 : 20} fill="#1ed760" color="#1ed760" /> : <Heart size={isMobile ? 18 : 20} color="var(--text-subdued)" />}
                   </div>
-                  <div onClick={(e) => downloadToLibrary(track, e)} style={{ cursor: downloading[track.trackId] ? 'default' : 'pointer', minWidth: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {downloading[track.trackId] === 'loading' ? (
-                      <Loader size={isMobile ? 18 : 20} color="#1ed760" style={{ animation: 'spin 1s linear infinite' }} />
-                    ) : downloading[track.trackId] === 'done' ? (
-                      <Check size={isMobile ? 18 : 20} color="#1ed760" />
-                    ) : (
-                      <Download size={isMobile ? 18 : 20} color="var(--text-subdued)" />
-                    )}
-                  </div>
+                  {/* Download icon hidden to prevent confusion */}
                 </div>
 
                 {/* Album + Duration - desktop only */}
