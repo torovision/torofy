@@ -156,9 +156,9 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   useEffect(() => {
     let interval;
     if (isPlaying && ytPlayer && currentTrack && !currentTrack.isLocal && !streamUrl) {
-      interval = setInterval(async () => {
+      interval = setInterval(() => {
         try {
-          const time = await ytPlayer.getCurrentTime();
+          const time = ytPlayer.getCurrentTime();
           if (time !== undefined) setCurrentTime(time);
         } catch (e) {}
       }, 500);
@@ -167,8 +167,11 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
   }, [isPlaying, ytPlayer, currentTrack, streamUrl]);
 
   const onYtReady = (e) => {
-    setYtPlayer(e.target);
-    e.target.setVolume(volume * 100);
+    const player = e.target;
+    setYtPlayer(player);
+    player.setVolume(volume * 100);
+    // Explicitly start playback for mobile browsers that block autoplay
+    player.playVideo();
   };
 
   const onYtStateChange = (e) => {
@@ -177,7 +180,7 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
       e.target.setVolume(volume * 100); // Enforce max volume
       setIsPlaying(true);
       setIsBuffering(false);
-      e.target.getDuration().then(d => setDuration(d));
+      try { setDuration(e.target.getDuration()); } catch(err) {}
     } else if (e.data === 2) {
       setIsPlaying(false);
     } else if (e.data === 0) {
@@ -456,7 +459,7 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
         {!currentTrack.isLocal && !streamUrl && resolvedYtId && (
           <YouTube 
             videoId={resolvedYtId}
-            opts={{ height: '0', width: '0', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1 } }}
+            opts={{ height: '1', width: '1', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin } }}
             onReady={onYtReady}
             onStateChange={onYtStateChange}
             onError={() => { setIsBuffering(false); playNext(); }}
@@ -716,7 +719,7 @@ const Player = ({ currentTrack, isPlaying, setIsPlaying, playNext, playPrev, isS
       {currentTrack && !currentTrack.isLocal && !streamUrl && resolvedYtId && (
         <YouTube 
           videoId={resolvedYtId}
-          opts={{ height: '0', width: '0', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1 } }}
+          opts={{ height: '1', width: '1', playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin } }}
           onReady={onYtReady}
           onStateChange={onYtStateChange}
           onError={() => { setIsBuffering(false); playNext(); }}
